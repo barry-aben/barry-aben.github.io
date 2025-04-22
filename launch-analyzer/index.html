@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adobe Launch Library Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-content">
+            <h3>Navigation</h3>
+            <ul>
+                <li><a href="#library-overview">Library Overview</a></li>
+                <li><a href="#extensions">Extensions</a></li>
+                <li><a href="#data-elements">Data Elements</a></li>
+                <li><a href="#rules">Rules</a></li>
+                <li><a href="#satellite-object">_satellite Object</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="main-content">
+        <div class="container">
+            <h1>Adobe Launch Library Analyzer</h1>
+            <p>This tool analyzes Adobe Launch (Adobe Experience Platform Tags) libraries to extract information about data elements, rules, extensions, and their relationships.</p>
+            
+            <div class="form-group">
+                <label for="launchUrl">Adobe Launch Library URL:</label>
+                <input type="text" id="launchUrl" placeholder="https://assets.adobedtm.com/launch-ENxxxxxxxxxxxxxx.min.js">
+                <small>Example: https://assets.adobedtm.com/launch-ENxxxxxxxxxxxxxx.min.js</small>
+            </div>
+            
+            <button id="analyzeBtn">Analyze Library</button>
+            
+            <div id="status" style="display: none;"></div>
+            
+            <div id="results" style="display: none;">
+                <h2>Analysis Results</h2>
+                
+                <div id="library-overview" class="section">
+                    <h3>Library Overview</h3>
+                    <div id="libraryInfo"></div>
+                </div>
+                
+                <div id="extensions" class="section">
+                    <h3>Extensions</h3>
+                    <div id="extensionsInfo"></div>
+                </div>
+                
+                <div id="data-elements" class="section">
+                    <h3>Data Elements</h3>
+                    <div id="dataElements"></div>
+                </div>
+                
+                <div id="rules" class="section">
+                    <h3>Rules</h3>
+                    <div id="rulesInfo"></div>
+                </div>
+                
+                <div id="satellite-object" class="section">
+                    <h3>Raw _satellite Object</h3>
+                    <details>
+                        <summary>Click to view _satellite object (Advanced)</summary>
+                        <div id="satelliteObject" class="json-viewer"></div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
