@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const launchUrlInput = document.getElementById('launchUrl');
+    const companyIdInput = document.getElementById('companyId');
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
     
@@ -48,7 +49,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Extract rules first to collect references
                     extractRules();
-                    
                     // Scan extensions for references
                     scanExtensionsForDataElements();
                     
@@ -89,6 +89,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const buildInfo = _satellite.buildInfo || {};
         const environment = _satellite.environment || {};
         
+        // Get property info
+        const propertyInfo = _satellite.property || {};
+        
+        // Get company ID from input
+        const companyId = companyIdInput.value.trim() || 'Not specified';
+        
+        html += `<tr><td><strong>Company ID</strong></td><td>${companyId}</td></tr>`;
+        html += `<tr><td><strong>Property ID</strong></td><td>${propertyInfo.id || 'Unknown'}</td></tr>`;
+        html += `<tr><td><strong>Property Name</strong></td><td>${propertyInfo.name || 'Unknown'}</td></tr>`;
         html += `<tr><td><strong>Library Name</strong></td><td>${buildInfo.name || 'Unknown'}</td></tr>`;
         html += `<tr><td><strong>Library Version</strong></td><td>${buildInfo.version || 'Unknown'}</td></tr>`;
         html += `<tr><td><strong>Build Date</strong></td><td>${buildInfo.buildDate || 'Unknown'}</td></tr>`;
@@ -207,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Try to get default value
                         if (details.defaultValue !== undefined) {
-                            defaultValue = typeof details.defaultValue === 'string' 
+                            defaultValue = typeof details.defaultValue === 'string'
                                 ? escapeHtml(details.defaultValue) 
                                 : escapeHtml(JSON.stringify(details.defaultValue));
                         } else if (details.settings && details.settings.defaultValue !== undefined) {
@@ -238,8 +247,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const ruleEventRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Event');
                         const ruleConditionRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Condition');
                         const ruleActionRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Action');
-                        const customCodeRefs = references.filter(ref => ref.type === 'customCode');
                         const dataElementRefs = references.filter(ref => ref.type === 'dataElement');
+                        const customCodeRefs = references.filter(ref => ref.type === 'customCode');
                         const extensionRefs = references.filter(ref => ref.type === 'extension');
                         
                         // Rule Event references
@@ -388,7 +397,6 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Try different ways to extract rules
             let rules = [];
-            
             // Method 1: Check property.settings.rules
             if (_satellite.property && 
                 _satellite.property.settings && 
@@ -480,107 +488,105 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (customCodeContent) {
                     customCodeBlocks.push({
                         type: 'rule',
-                        name: rule.name,
+                        ruleName: rule.name,
                         context: context,
                         code: customCodeContent
                     });
+                    
+                    // Scan the custom code for data elements
+                    scanCustomCodeForDataElements(customCodeContent, rule.name, context);
+                }
+            } else if (context === 'Condition' && 
+                      (obj.type === 'custom_code' || 
+                       (obj.modulePath && obj.modulePath.includes('custom-code')))) {
+                isCustomCode = true;
+                
+                // Extract the code content
+                if (obj.settings && obj.settings.source) {
+                    customCodeContent = obj.settings.source;
+                } else if (obj.source) {
+                    customCodeContent = obj.source;
+                }
+                
+                // Add to custom code blocks
+                if (customCodeContent) {
+                    customCodeBlocks.push({
+                        type: 'rule',
+                        ruleName: rule.name,
+                        context: context,
+                        code: customCodeContent
+                    });
+                    
+                    // Scan the custom code for data elements
+                    scanCustomCodeForDataElements(customCodeContent, rule.name, context);
                 }
             }
             
-            if (typeof obj === 'string') {
-                // Look for %dataElement% patterns
-                const percentMatches = obj.match(/%([^%]+)%/g);
-                if (percentMatches) {
-                    percentMatches.forEach(match => {
-                        const name = match.replace(/%/g, '');
-                        dataElementsUsed.add(name);
-                        
-                        // Record reference for the data element reference analysis
-                        if (!dataElementReferences[name]) {
-                            dataElementReferences[name] = [];
-                        }
-                        dataElementReferences[name].push({
-                            type: 'rule',
-                            name: rule.name,
-                            context: context,
-                            isCustomCode: isCustomCode
-                        });
-                    });
-                }
-                
-                // Look for _satellite.getVar("dataElement") patterns
-                const getVarMatches = obj.match(/_satellite\.getVar\(['"](.+?)['"](?:,|[)])/g);
-                if (getVarMatches) {
-                    getVarMatches.forEach(match => {
-                        const name = match.match(/_satellite\.getVar\(['"](.+?)['"](?:,|[)])/)[1];
-                        dataElementsUsed.add(name);
-                        
-                        // Record reference
-                        if (!dataElementReferences[name]) {
-                            dataElementReferences[name] = [];
-                        }
-                        dataElementReferences[name].push({
-                            type: 'rule',
-                            name: rule.name,
-                            context: context,
-                            isCustomCode: isCustomCode
-                        });
-                    });
-                }
-                
-                // For custom code, also look for more advanced ways to reference data elements
-                if (isCustomCode) {
-                    // _satellite.getVar() without quotes or with variable
-                    const advancedGetVarMatches = obj.match(/_satellite\.getVar\(([^'"]*?)\)/g);
-                    if (advancedGetVarMatches) {
-                        // These are potential references but the actual name might be dynamic
-                        // Just note that there might be dynamic references
-                        // No action needed for now
+            // If it's an object, look for properties that might contain data element references
+            if (typeof obj === 'object' && obj !== null) {
+                // Check for direct data element references
+                if (obj.dataElementName) {
+                    dataElementsUsed.add(obj.dataElementName);
+                    
+                    // Add reference for this data element
+                    if (!dataElementReferences[obj.dataElementName]) {
+                        dataElementReferences[obj.dataElementName] = [];
                     }
                     
-                    // _satellite.data.getVar
-                    const dataGetVarMatches = obj.match(/_satellite\.data\.getVar\(['"](.+?)['"](?:,|[)])/g);
-                    if (dataGetVarMatches) {
-                        dataGetVarMatches.forEach(match => {
-                            const name = match.match(/_satellite\.data\.getVar\(['"](.+?)['"](?:,|[)])/)[1];
-                            dataElementsUsed.add(name);
+                    dataElementReferences[obj.dataElementName].push({
+                        type: 'rule',
+                        name: rule.name,
+                        context: context,
+                        isCustomCode: isCustomCode
+                    });
+                }
+                
+                // Check each property
+                Object.keys(obj).forEach(key => {
+                    if (typeof obj[key] === 'string') {
+                        // Look for data element notation (%dataElement%) in strings
+                        const dataElements = findDataElementsInString(obj[key]);
+                        
+                        // Add all found data elements
+                        dataElements.forEach(dataElement => {
+                            dataElementsUsed.add(dataElement);
                             
-                            // Record reference
-                            if (!dataElementReferences[name]) {
-                                dataElementReferences[name] = [];
+                            // Add reference for this data element
+                            if (!dataElementReferences[dataElement]) {
+                                dataElementReferences[dataElement] = [];
                             }
-                            dataElementReferences[name].push({
+                            
+                            dataElementReferences[dataElement].push({
                                 type: 'rule',
                                 name: rule.name,
                                 context: context,
+                                property: key,
                                 isCustomCode: isCustomCode
                             });
                         });
+                    } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                        // Recursively scan nested objects
+                        scanForDataElements(obj[key], context);
                     }
-                }
-            } else if (typeof obj === 'object') {
-                // For objects, scan each property recursively
-                for (const key in obj) {
-                    scanForDataElements(obj[key], context);
-                }
+                });
             }
         }
         
-        // Scan events
+        // Scan rule events
         if (rule.events && Array.isArray(rule.events)) {
             rule.events.forEach(event => {
                 scanForDataElements(event, 'Event');
             });
         }
         
-        // Scan conditions
+        // Scan rule conditions
         if (rule.conditions && Array.isArray(rule.conditions)) {
             rule.conditions.forEach(condition => {
                 scanForDataElements(condition, 'Condition');
             });
         }
         
-        // Scan actions
+        // Scan rule actions
         if (rule.actions && Array.isArray(rule.actions)) {
             rule.actions.forEach(action => {
                 scanForDataElements(action, 'Action');
@@ -589,37 +595,81 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return {
             dataElementsUsed: Array.from(dataElementsUsed),
-            customCode: customCodeBlocks
+            customCodeBlocks: customCodeBlocks
         };
+    }
+    
+    function findDataElementsInString(str) {
+        if (typeof str !== 'string') return [];
+        
+        const dataElements = new Set();
+        
+        // Pattern for %dataElement%
+        const pattern1 = /%([^%]+)%/g;
+        let match;
+        
+        while (match = pattern1.exec(str)) {
+            dataElements.add(match[1]);
+        }
+        
+        // Check for _satellite.getVar('dataElement')
+        const pattern2 = /_satellite\.getVar\(['"](.*?)['"]\)/g;
+        while (match = pattern2.exec(str)) {
+            dataElements.add(match[1]);
+        }
+        
+        return Array.from(dataElements);
+    }
+    
+    function scanCustomCodeForDataElements(code, parentName, context) {
+        if (typeof code !== 'string') return [];
+        
+        const dataElements = findDataElementsInString(code);
+        
+        // Add references for all found data elements
+        dataElements.forEach(dataElement => {
+            if (!dataElementReferences[dataElement]) {
+                dataElementReferences[dataElement] = [];
+            }
+            
+            dataElementReferences[dataElement].push({
+                type: 'customCode',
+                name: parentName,
+                context: context,
+                isCustomCode: true
+            });
+        });
+        
+        return dataElements;
     }
     
     function scanDataElementsForCustomCode() {
         try {
-            // Try different ways to access data elements
-            let dataElements = {};
+            let dataElementDetails = {};
             
+            // Try to get data element details from different locations
             if (_satellite.property && 
                 _satellite.property.settings && 
                 _satellite.property.settings.dataElements) {
-                dataElements = _satellite.property.settings.dataElements;
+                dataElementDetails = _satellite.property.settings.dataElements;
             } else if (_satellite._container && 
-                       _satellite._container.dataElements) {
-                dataElements = _satellite._container.dataElements;
+                     _satellite._container.dataElements) {
+                dataElementDetails = _satellite._container.dataElements;
             }
             
-            // Loop through data elements
-            for (const name in dataElements) {
-                const details = dataElements[name];
+            // Scan each data element
+            Object.keys(dataElementDetails).forEach(name => {
+                const details = dataElementDetails[name];
                 let isCustomCode = false;
                 let codeContent = '';
                 
                 // Check if this is a custom code data element
                 if (details.type === 'javascript' || 
-                    details.type === 'custom_code' ||
+                    details.type === 'custom_code' || 
                     (details.modulePath && details.modulePath.includes('custom-code'))) {
                     isCustomCode = true;
                     
-                    // Get the code content
+                    // Extract the code content
                     if (details.settings && details.settings.source) {
                         codeContent = details.settings.source;
                     } else if (details.source) {
@@ -629,193 +679,133 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 
-                // If this is custom code, scan for references to other data elements
+                // If this is custom code, scan it for data element references
                 if (isCustomCode && codeContent) {
-                    // Scan for references to other data elements
-                    scanCustomCodeForDataElements(codeContent, name);
+                    const referencedElements = findDataElementsInString(codeContent);
+                    
+                    // Add references for all found data elements
+                    referencedElements.forEach(refName => {
+                        if (!dataElementReferences[refName]) {
+                            dataElementReferences[refName] = [];
+                        }
+                        
+                        dataElementReferences[refName].push({
+                            type: 'dataElement',
+                            name: name,
+                            isCustomCode: true
+                        });
+                    });
                 }
-            }
+            });
         } catch (error) {
             console.error('Error scanning data elements for custom code:', error);
         }
     }
     
-    function scanCustomCodeForDataElements(code, sourceName) {
-        try {
-            if (!code || typeof code !== 'string') return;
-            
-            // Look for %dataElement% patterns
-            const percentMatches = code.match(/%([^%]+)%/g);
-            if (percentMatches) {
-                percentMatches.forEach(match => {
-                    const name = match.replace(/%/g, '');
-                    
-                    // Record reference
-                    if (!dataElementReferences[name]) {
-                        dataElementReferences[name] = [];
-                    }
-                    dataElementReferences[name].push({
-                        type: 'customCode',
-                        name: sourceName,
-                        context: 'Data Element',
-                        isCustomCode: true
-                    });
-                });
-            }
-            
-            // Look for _satellite.getVar("dataElement") patterns
-            const getVarMatches = code.match(/_satellite\.getVar\(['"](.+?)['"](?:,|[)])/g);
-            if (getVarMatches) {
-                getVarMatches.forEach(match => {
-                    const name = match.match(/_satellite\.getVar\(['"](.+?)['"](?:,|[)])/)[1];
-                    
-                    // Record reference
-                    if (!dataElementReferences[name]) {
-                        dataElementReferences[name] = [];
-                    }
-                    dataElementReferences[name].push({
-                        type: 'customCode',
-                        name: sourceName,
-                        context: 'Data Element',
-                        isCustomCode: true
-                    });
-                });
-            }
-            
-            // Check for _satellite.data.getVar
-            const dataGetVarMatches = code.match(/_satellite\.data\.getVar\(['"](.+?)['"](?:,|[)])/g);
-            if (dataGetVarMatches) {
-                dataGetVarMatches.forEach(match => {
-                    const name = match.match(/_satellite\.data\.getVar\(['"](.+?)['"](?:,|[)])/)[1];
-                    
-                    // Record reference
-                    if (!dataElementReferences[name]) {
-                        dataElementReferences[name] = [];
-                    }
-                    dataElementReferences[name].push({
-                        type: 'customCode',
-                        name: sourceName,
-                        context: 'Data Element',
-                        isCustomCode: true
-                    });
-                });
-            }
-        } catch (error) {
-            console.error('Error scanning custom code for data elements:', error);
-        }
-    }
-    
     function scanExtensionsForDataElements() {
         try {
-            let extensions = {};
+            let extensionDetails = {};
             
-            // Try different ways to access extension configurations
+            // Try to get extension details from different locations
             if (_satellite.extensionConfiguration) {
-                extensions = _satellite.extensionConfiguration;
+                extensionDetails = _satellite.extensionConfiguration;
             } else if (_satellite.property && 
-                      _satellite.property.settings && 
-                      _satellite.property.settings.extensions) {
-                extensions = _satellite.property.settings.extensions;
-            } else if (_satellite._container && _satellite._container.extensions) {
-                extensions = _satellite._container.extensions;
+                     _satellite.property.settings && 
+                     _satellite.property.settings.extensions) {
+                extensionDetails = _satellite.property.settings.extensions;
             }
             
-            // Function to scan an object for data element references
-            function scanObjectForDataElements(obj, extensionName, context) {
-                if (!obj) return;
+            // Scan each extension
+            Object.keys(extensionDetails).forEach(extName => {
+                const extension = extensionDetails[extName];
                 
-                if (typeof obj === 'string') {
-                    // Look for %dataElement% patterns
-                    const percentMatches = obj.match(/%([^%]+)%/g);
-                    if (percentMatches) {
-                        percentMatches.forEach(match => {
-                            const name = match.replace(/%/g, '');
-                            
-                            // Record reference
-                            if (!dataElementReferences[name]) {
-                                dataElementReferences[name] = [];
-                            }
-                            dataElementReferences[name].push({
-                                type: 'extension',
-                                name: extensionName,
-                                context: context
-                            });
-                        });
-                    }
+                // Skip core extension
+                if (extName === 'core') return;
+                
+                // Recursively scan extension settings
+                function scanObject(obj, path) {
+                    if (!obj || typeof obj !== 'object') return;
                     
-                    // Look for _satellite.getVar("dataElement") patterns
-                    const getVarMatches = obj.match(/_satellite\.getVar\(['"](.+?)['"](?:,|[)])/g);
-                    if (getVarMatches) {
-                        getVarMatches.forEach(match => {
-                            const name = match.match(/_satellite\.getVar\(['"](.+?)['"](?:,|[)])/)[1];
+                    // Check for data element references in strings
+                    Object.keys(obj).forEach(key => {
+                        if (typeof obj[key] === 'string') {
+                            const dataElements = findDataElementsInString(obj[key]);
                             
-                            // Record reference
-                            if (!dataElementReferences[name]) {
-                                dataElementReferences[name] = [];
-                            }
-                            dataElementReferences[name].push({
-                                type: 'extension',
-                                name: extensionName,
-                                context: context
+                            // Add references for found data elements
+                            dataElements.forEach(dataElement => {
+                                if (!dataElementReferences[dataElement]) {
+                                    dataElementReferences[dataElement] = [];
+                                }
+                                
+                                dataElementReferences[dataElement].push({
+                                    type: 'extension',
+                                    name: extName,
+                                    context: path ? `${path}.${key}` : key
+                                });
                             });
-                        });
-                    }
-                } else if (typeof obj === 'object') {
-                    // For objects, scan each property recursively
-                    for (const key in obj) {
-                        scanObjectForDataElements(obj[key], extensionName, context + '.' + key);
-                    }
+                        } else if (obj[key] && typeof obj[key] === 'object') {
+                            // Recursively scan nested objects
+                            scanObject(obj[key], path ? `${path}.${key}` : key);
+                        }
+                    });
                 }
-            }
-            
-            // Scan each extension configuration
-            for (const extensionName in extensions) {
-                const config = extensions[extensionName];
-                scanObjectForDataElements(config, extensionName, 'Configuration');
-            }
+                
+                // Start scanning from the settings
+                if (extension.settings) {
+                    scanObject(extension.settings, 'settings');
+                }
+            });
         } catch (error) {
             console.error('Error scanning extensions for data elements:', error);
         }
     }
     
     function showSatelliteObject() {
-        const satelliteObjectDiv = document.getElementById('satelliteObject');
-        
         try {
-            // Try to stringify the _satellite object
-            // This may fail if it contains circular references
-            const satelliteStr = JSON.stringify(_satellite, function(key, value) {
-                // Skip functions
-                if (typeof value === 'function') {
-                    return 'function() { ... }';
+            const satelliteDiv = document.getElementById('satelliteObject');
+            
+            // Create a simplified version of _satellite to avoid circular references
+            const simplifiedSatellite = {};
+            
+            // Copy non-circular properties
+            for (const key in _satellite) {
+                try {
+                    if (key === '_container') {
+                        // Special handling for _container to avoid circular references
+                        simplifiedSatellite[key] = {
+                            dataElements: _satellite._container.dataElements ? Object.keys(_satellite._container.dataElements) : [],
+                            extensions: _satellite._container.extensions ? Object.keys(_satellite._container.extensions) : [],
+                            rules: _satellite._container.rules ? _satellite._container.rules.map(r => r.name) : []
+                        };
+                    } else if (typeof _satellite[key] !== 'function' && key !== 'logger') {
+                        simplifiedSatellite[key] = _satellite[key];
+                    }
+                } catch (e) {
+                    simplifiedSatellite[key] = `[Error accessing property: ${e.message}]`;
                 }
-                return value;
-            }, 2);
-            
-            satelliteObjectDiv.textContent = satelliteStr;
-        } catch (error) {
-            satelliteObjectDiv.textContent = 'Could not stringify _satellite object: ' + error.message;
-            
-            // Create a list of top-level properties instead
-            let props = [];
-            for (let prop in _satellite) {
-                let type = typeof _satellite[prop];
-                props.push(`${prop} (${type})`);
             }
             
-            satelliteObjectDiv.textContent += '\n\nTop-level properties:\n' + props.join('\n');
+            // Convert to formatted JSON
+            const json = JSON.stringify(simplifiedSatellite, null, 2);
+            satelliteDiv.textContent = json;
+        } catch (error) {
+            console.error('Error displaying _satellite object:', error);
+            const satelliteDiv = document.getElementById('satelliteObject');
+            satelliteDiv.textContent = `Error accessing _satellite object: ${error.message}`;
         }
     }
     
     function showStatus(message, type) {
-        statusDiv.textContent = message;
-        statusDiv.className = type;
+        statusDiv.innerHTML = message;
+        statusDiv.className = type || '';
         statusDiv.style.display = 'block';
     }
     
     function escapeHtml(text) {
         if (text === undefined || text === null) return '';
-        return String(text)
+        
+        return text
+            .toString()
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -823,36 +813,45 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/'/g, '&#039;');
     }
     
-    // Add sorting functionality to tables
     function addSortingToTable(table) {
+        if (!table) return;
+        
         const headers = table.querySelectorAll('th');
         
         headers.forEach((header, index) => {
+            header.setAttribute('data-index', index);
             header.addEventListener('click', function() {
                 sortTable(table, index, this);
             });
         });
     }
     
-    function sortTable(table, column, header) {
+    function sortTable(table, columnIndex, header) {
         const tbody = table.querySelector('tbody');
         const rows = Array.from(tbody.querySelectorAll('tr'));
-        const currentDir = header.classList.contains('sort-asc') ? 'asc' : 'desc';
-        const newDir = currentDir === 'asc' ? 'desc' : 'asc';
         
-        // Remove existing sort classes from all headers
-        table.querySelectorAll('th').forEach(th => {
-            th.classList.remove('sort-asc', 'sort-desc');
+        // Get current direction
+        let currentDir = header.classList.contains('sort-asc') ? 'asc' : 
+                        header.classList.contains('sort-desc') ? 'desc' : 'none';
+        
+        // Determine new direction
+        let newDir = currentDir === 'asc' ? 'desc' : 'asc';
+        
+        // Remove sort indicators from all headers
+        const headers = table.querySelectorAll('th');
+        headers.forEach(h => {
+            h.classList.remove('sort-asc', 'sort-desc');
         });
         
-        // Add sort class to current header
+        // Add sort indicator to current header
         header.classList.add(`sort-${newDir}`);
         
-        // Sort the rows based on the content of the specified column
-        rows.sort((a, b) => {
-            let cellA = a.querySelectorAll('td')[column];
-            let cellB = b.querySelectorAll('td')[column];
+        // Sort rows
+        rows.sort((rowA, rowB) => {
+            const cellA = rowA.querySelectorAll('td')[columnIndex];
+            const cellB = rowB.querySelectorAll('td')[columnIndex];
             
+            // Check for data-sort-value attribute first
             let valueA = cellA.getAttribute('data-sort-value') || cellA.textContent.trim();
             let valueB = cellB.getAttribute('data-sort-value') || cellB.textContent.trim();
             
