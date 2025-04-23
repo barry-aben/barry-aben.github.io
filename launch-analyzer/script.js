@@ -873,3 +873,4 @@ document.addEventListener('DOMContentLoaded', function() {
         rows.forEach(row => tbody.appendChild(row));
     }
 });
+
