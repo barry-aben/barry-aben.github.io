@@ -95,8 +95,18 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get company ID from input
         const companyId = companyIdInput.value.trim() || 'Not specified';
         
+        // Create property link (if we have company ID and property ID)
+        let propertyLink = '';
+        const propertyId = propertyInfo.id || '';
+        
+        if (companyId !== 'Not specified' && propertyId) {
+            
+            const launchUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/overview`;
+            propertyLink = ` <a href="${launchUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+        }
+        
         html += `<tr><td><strong>Company ID</strong></td><td>${companyId}</td></tr>`;
-        html += `<tr><td><strong>Property ID</strong></td><td>${propertyInfo.id || 'Unknown'}</td></tr>`;
+        html += `<tr><td><strong>Property ID</strong></td><td>${propertyId}${propertyLink}</td></tr>`;
         html += `<tr><td><strong>Property Name</strong></td><td>${propertyInfo.name || 'Unknown'}</td></tr>`;
         html += `<tr><td><strong>Library Name</strong></td><td>${buildInfo.name || 'Unknown'}</td></tr>`;
         html += `<tr><td><strong>Library Version</strong></td><td>${buildInfo.version || 'Unknown'}</td></tr>`;
@@ -104,6 +114,25 @@ document.addEventListener('DOMContentLoaded', function() {
         html += `<tr><td><strong>Environment</strong></td><td>${environment.stage || 'Unknown'}</td></tr>`;
         
         html += '</table></div>';
+        
+        // Add CSS for the link
+        html += `
+        <style>
+        .launch-link {
+            display: inline-block;
+            margin-left: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            color: #e34850;
+            transition: all 0.2s;
+        }
+        .launch-link:hover {
+            transform: scale(1.2);
+            color: #c73b42;
+        }
+        </style>
+        `;
+        
         libraryInfoDiv.innerHTML = html;
     }
     
@@ -873,4 +902,3 @@ document.addEventListener('DOMContentLoaded', function() {
         rows.forEach(row => tbody.appendChild(row));
     }
 });
-
