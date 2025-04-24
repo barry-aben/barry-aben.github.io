@@ -160,6 +160,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 extensionDetails = _satellite._container.extensions;
             }
             
+            // Get property and company info for links
+            const propertyInfo = _satellite.property || {};
+            const propertyId = propertyInfo.id || '';
+            const companyId = companyIdInput.value.trim() || '';
+            let canCreateLinks = companyId && propertyId;
+            
             if (extensions.length > 0) {
                 let html = `<p>Found ${extensions.length} extensions:</p>`;
                 html += '<div class="table-container"><table class="sortable-table">';
@@ -169,7 +175,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const details = extensionDetails[extension] || {};
                     const version = details.version || details.settings?.version || 'Unknown';
                     
-                    html += `<tr><td>${extension}</td><td>${version}</td></tr>`;
+                    // Create link to extension in Launch if possible
+                    let extensionLink = '';
+                    if (canCreateLinks) {
+                        const launchUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/extensions/${encodeURIComponent(extension)}`;
+                        extensionLink = ` <a href="${launchUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                    }
+                    
+                    html += `<tr><td>${extension}${extensionLink}</td><td>${version}</td></tr>`;
                 });
                 
                 html += '</tbody></table></div>';
@@ -212,6 +225,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Store data elements globally for reference analysis
             dataElementsList = dataElements;
             
+            // Get property and company info for links
+            const propertyInfo = _satellite.property || {};
+            const propertyId = propertyInfo.id || '';
+            const companyId = companyIdInput.value.trim() || '';
+            let canCreateLinks = companyId && propertyId;
+            
             if (dataElements.length > 0) {
                 let html = `<p>Found ${dataElements.length} data elements:</p>`;
                 html += '<div class="table-container"><table class="sortable-table">';
@@ -253,32 +272,35 @@ document.addEventListener('DOMContentLoaded', function() {
                                 ? escapeHtml(details.settings.defaultValue)
                                 : escapeHtml(JSON.stringify(details.settings.defaultValue));
                         }
-                        
-                        // Add custom code badge to type if needed
-                        if (isCustomCode) {
-                            type += ' <span class="custom-code-badge">Custom Code</span>';
-                        }
-                    } catch (error) {
-                        console.error(`Error processing data element ${name}:`, error);
+                    } catch (e) {
+                        console.error('Error getting details for data element', name, e);
                     }
                     
-                    // Calculate the references count
+                    // Create link to data element in Launch if possible
+                    let dataElementLink = '';
+                    if (canCreateLinks) {
+                        const launchUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/dataElements/edit/${encodeURIComponent(name)}`;
+                        dataElementLink = ` <a href="${launchUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                    }
+                    
+                    // Get references
                     const references = dataElementReferences[name] || [];
                     const refCount = references.length;
                     
-                    // Generate references HTML
+                    // Group references by type
+                    const ruleEventRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Event');
+                    const ruleConditionRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Condition');
+                    const ruleActionRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Action');
+                    const dataElementRefs = references.filter(ref => ref.type === 'dataElement');
+                    const extensionRefs = references.filter(ref => ref.type === 'extension');
+                    const customCodeRefs = references.filter(ref => ref.isCustomCode);
+                    
+                    // Create references HTML
                     let referencesHtml = '';
+                    
                     if (refCount > 0) {
-                        referencesHtml = `<div><span class="badge">${refCount}</span> references</div>`;
-                        referencesHtml += `<div class="collapsible-content">`;
-                        
-                        // Group references by type
-                        const ruleEventRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Event');
-                        const ruleConditionRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Condition');
-                        const ruleActionRefs = references.filter(ref => ref.type === 'rule' && ref.context === 'Action');
-                        const dataElementRefs = references.filter(ref => ref.type === 'dataElement');
-                        const customCodeRefs = references.filter(ref => ref.type === 'customCode');
-                        const extensionRefs = references.filter(ref => ref.type === 'extension');
+                        // This div structure is crucial - the badge is clickable, not just the number
+                        referencesHtml = `<div class="reference-badge" title="Click to see references"><span class="badge">${refCount}</span></div><div class="reference-details" style="display: none; margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9;">`;
                         
                         // Rule Event references
                         if (ruleEventRefs.length > 0) {
@@ -291,7 +313,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (ref.isCustomCode) {
                                     badge = ' <span class="custom-code-badge">Custom Code</span>';
                                 }
-                                referencesHtml += `<li>${ref.name}${badge}</li>`;
+                                
+                                // Create rule link if possible
+                                let ruleLink = '';
+                                if (canCreateLinks) {
+                                    const ruleUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/rules/edit/${encodeURIComponent(ref.name)}`;
+                                    ruleLink = ` <a href="${ruleUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                                }
+                                
+                                referencesHtml += `<li>${ref.name}${ruleLink}${badge}</li>`;
                             });
                             
                             referencesHtml += `</ul></div>`;
@@ -308,7 +338,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (ref.isCustomCode) {
                                     badge = ' <span class="custom-code-badge">Custom Code</span>';
                                 }
-                                referencesHtml += `<li>${ref.name}${badge}</li>`;
+                                
+                                // Create rule link if possible
+                                let ruleLink = '';
+                                if (canCreateLinks) {
+                                    const ruleUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/rules/edit/${encodeURIComponent(ref.name)}`;
+                                    ruleLink = ` <a href="${ruleUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                                }
+                                
+                                referencesHtml += `<li>${ref.name}${ruleLink}${badge}</li>`;
                             });
                             
                             referencesHtml += `</ul></div>`;
@@ -325,26 +363,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (ref.isCustomCode) {
                                     badge = ' <span class="custom-code-badge">Custom Code</span>';
                                 }
-                                referencesHtml += `<li>${ref.name}${badge}</li>`;
+                                
+                                // Create rule link if possible
+                                let ruleLink = '';
+                                if (canCreateLinks) {
+                                    const ruleUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/rules/edit/${encodeURIComponent(ref.name)}`;
+                                    ruleLink = ` <a href="${ruleUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                                }
+                                
+                                referencesHtml += `<li>${ref.name}${ruleLink}${badge}</li>`;
                             });
                             
                             referencesHtml += `</ul></div>`;
                         }
                         
-                        // Custom Code references
-                        if (customCodeRefs.length > 0) {
-                            referencesHtml += `<div class="reference-section">
-                                <div class="reference-category">Custom Code (${customCodeRefs.length}):</div>
-                                <ul class="references-list">`;
-                            
-                            customCodeRefs.forEach(ref => {
-                                referencesHtml += `<li>${ref.name} ${ref.context}</li>`;
-                            });
-                            
-                            referencesHtml += `</ul></div>`;
-                        }
-                        
-                        // Data Element references
+                        // Data Elements references
                         if (dataElementRefs.length > 0) {
                             referencesHtml += `<div class="reference-section">
                                 <div class="reference-category">Data Elements (${dataElementRefs.length}):</div>
@@ -355,7 +388,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (ref.isCustomCode) {
                                     badge = ' <span class="custom-code-badge">Custom Code</span>';
                                 }
-                                referencesHtml += `<li>${ref.name}${badge}</li>`;
+                                
+                                // Create data element link if possible
+                                let dataElemLink = '';
+                                if (canCreateLinks) {
+                                    const dataElemUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/dataElements/edit/${encodeURIComponent(ref.name)}`;
+                                    dataElemLink = ` <a href="${dataElemUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                                }
+                                
+                                referencesHtml += `<li>${ref.name}${dataElemLink}${badge}</li>`;
                             });
                             
                             referencesHtml += `</ul></div>`;
@@ -368,7 +409,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <ul class="references-list">`;
                             
                             extensionRefs.forEach(ref => {
-                                referencesHtml += `<li>${ref.name} (${ref.context})</li>`;
+                                // Create extension link if possible
+                                let extensionLink = '';
+                                if (canCreateLinks) {
+                                    const extUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/extensions/${encodeURIComponent(ref.name)}`;
+                                    extensionLink = ` <a href="${extUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                                }
+                                
+                                referencesHtml += `<li>${ref.name}${extensionLink} (${ref.context})</li>`;
                             });
                             
                             referencesHtml += `</ul></div>`;
@@ -381,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     html += `<tr>
-                        <td>${name}</td>
+                        <td>${name}${dataElementLink}</td>
                         <td>${type}</td>
                         <td>${defaultValue}</td>
                         <td data-sort-value="${refCount}">${referencesHtml}</td>
@@ -391,21 +439,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += '</tbody></table></div>';
                 dataElementsDiv.innerHTML = html;
                 
-                // Add click handlers for the reference details
-                const cells = dataElementsDiv.querySelectorAll('td:nth-child(4) > div:first-child');
-                cells.forEach(cell => {
-                    if (cell.querySelector('.badge')) { // Only add click handler if it has a regular badge (not zero)
-                        cell.style.cursor = 'pointer';
-                        
-                        cell.addEventListener('click', function() {
-                            const content = this.nextElementSibling;
-                            if (content.style.display === 'block') {
-                                content.style.display = 'none';
-                            } else {
-                                content.style.display = 'block';
-                            }
-                        });
+                // Add CSS for the reference badge to ensure it's clickable
+                const style = document.createElement('style');
+                style.textContent = `
+                    .reference-badge {
+                        display: inline-block;
+                        cursor: pointer;
                     }
+                    .reference-badge:hover .badge {
+                        background-color: #c73b42;
+                    }
+                `;
+                dataElementsDiv.appendChild(style);
+                
+                // Add click handlers for the reference details
+                const badges = dataElementsDiv.querySelectorAll('.reference-badge');
+                badges.forEach(badge => {
+                    badge.addEventListener('click', function() {
+                        const details = this.nextElementSibling;
+                        if (details && details.classList.contains('reference-details')) {
+                            if (details.style.display === 'block') {
+                                details.style.display = 'none';
+                            } else {
+                                details.style.display = 'block';
+                            }
+                        }
+                    });
                 });
                 
                 // Add sorting functionality
@@ -438,6 +497,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 rules = _satellite._container.rules;
             }
             
+            // Get property and company info for links
+            const propertyInfo = _satellite.property || {};
+            const propertyId = propertyInfo.id || '';
+            const companyId = companyIdInput.value.trim() || '';
+            let canCreateLinks = companyId && propertyId;
+            
             if (rules.length > 0) {
                 let html = `<p>Found ${rules.length} rules:</p>`;
                 html += '<div class="table-container"><table class="sortable-table">';
@@ -446,6 +511,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 rules.forEach(rule => {
                     let name = rule.name || 'Unnamed Rule';
                     let events = [];
+                    
+                    // Create link to rule in Launch if possible
+                    let ruleLink = '';
+                    if (canCreateLinks) {
+                        const launchUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/rules/edit/${encodeURIComponent(name)}`;
+                        ruleLink = ` <a href="${launchUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                    }
                     
                     // Try to extract event types
                     if (rule.events && Array.isArray(rule.events)) {
@@ -460,13 +532,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     let dataElementsCell = '';
                     
                     if (dataElementsUsed.length > 0) {
-                        dataElementsCell = dataElementsUsed.join(', ');
+                        // Create links for each data element
+                        const dataElementLinks = dataElementsUsed.map(de => {
+                            if (canCreateLinks) {
+                                const deUrl = `https://experience.adobe.com/#data-collection/tags/companies/${companyId}/properties/${propertyId}/dataElements/edit/${encodeURIComponent(de)}`;
+                                return `${de} <a href="${deUrl}" target="_blank" title="Open in Adobe Launch" class="launch-link">📝</a>`;
+                            }
+                            return de;
+                        });
+                        dataElementsCell = dataElementLinks.join(', ');
                     } else {
                         dataElementsCell = 'None';
                     }
                     
                     html += `<tr>
-                        <td>${name}</td>
+                        <td>${name}${ruleLink}</td>
                         <td>${events.join(', ') || 'No events'}</td>
                         <td>${dataElementsCell}</td>
                     </tr>`;
@@ -642,7 +722,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Check for _satellite.getVar('dataElement')
-        const pattern2 = /_satellite\.getVar\(['"](.*?)['"]\)/g;
+        const pattern2 = /_satellite\.getVar\(['"](.+?)['"]\)/g;
         while (match = pattern2.exec(str)) {
             dataElements.add(match[1]);
         }
@@ -681,8 +761,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 _satellite.property.settings && 
                 _satellite.property.settings.dataElements) {
                 dataElementDetails = _satellite.property.settings.dataElements;
-            } else if (_satellite._container && 
-                     _satellite._container.dataElements) {
+            } else if (_satellite._container &&
+                _satellite._container.dataElements) {
                 dataElementDetails = _satellite._container.dataElements;
             }
             
@@ -891,6 +971,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isNaN(numA) && !isNaN(numB)) {
                 return newDir === 'asc' ? numA - numB : numB - numA;
             }
+            
             
             // String comparison
             return newDir === 'asc' 

@@ -234,59 +234,54 @@ summary:hover {
     margin-left: 5px;
 }
 
+/* Custom code badge for data elements */
+.custom-code-badge {
+    display: inline-block;
+    padding: 2px 5px;
+    font-size: 10px;
+    font-weight: bold;
+    border-radius: 4px;
+    background-color: #17a2b8;
+    color: white;
+    margin-left: 5px;
+}
+
+/* Style for reference sections */
+.reference-section {
+    margin-bottom: 12px;
+}
+
+.reference-category {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
 .references-list {
     margin: 0;
     padding-left: 20px;
 }
 
-.collapsible-content {
-    display: none;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 0 0 4px 4px;
-    margin-top: -10px;
-    margin-bottom: 10px;
-    border-top: none;
-}
-
-.reference-category {
-    font-weight: bold;
-    margin-top: 8px;
-    margin-bottom: 4px;
+/* Launch link styling */
+.launch-link {
+    display: inline-block;
+    margin-left: 8px;
+    text-decoration: none;
+    font-size: 16px;
     color: #e34850;
+    transition: all 0.2s;
 }
 
-.reference-section {
-    margin-bottom: 10px;
+.launch-link:hover {
+    transform: scale(1.2);
+    color: #c73b42;
 }
 
-.custom-code-badge {
-    background-color: #007bff;
-    font-size: 10px;
-    padding: 2px 5px;
-    border-radius: 8px;
-    color: white;
-    margin-left: 5px;
-    vertical-align: middle;
-}
-
-/* Status indicator styles */
-.status-enabled {
+/* Reference badge styling */
+.reference-badge {
     display: inline-block;
-    padding: 3px 7px;
-    font-size: 12px;
-    font-weight: bold;
-    border-radius: 10px;
-    background-color: #28a745; /* Green color */
-    color: white;
+    cursor: pointer;
 }
 
-.status-disabled {
-    display: inline-block;
-    padding: 3px 7px;
-    font-size: 12px;
-    font-weight: bold;
-    border-radius: 10px;
-    background-color: #dc3545; /* Red color */
-    color: white;
+.reference-badge:hover .badge {
+    background-color: #c73b42;
 }
